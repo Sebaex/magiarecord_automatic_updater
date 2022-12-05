@@ -125,7 +125,7 @@ Thanks to :
 Useful Links
 ------------
 
-MagiReco Discord: https://discord.gg/SNJyn5H \(Ping me with @veritas#8733\)
+MagiReco Discord: https://discord.gg/magiarecord \(~~Ping me with @veritas#8733~~ veritas is MIA lol, but people always welcome\)
 
 MagiReco English Wiki: http://magireco.wikia.com/wiki/Magia_Record_English_Wiki
 
