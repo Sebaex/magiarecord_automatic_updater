@@ -5,7 +5,6 @@ use std::io;
 use std::fs;
 use std::fs::File;
 use std::process::Command;
-use scraper::{Html, Selector};
 use std::env;
 use std::path::Path;
 use std::io::Write;
@@ -138,28 +137,12 @@ fn unzip_archive(path: &str){
     
 }
 
-fn process_apk_webpage(webpage: &str ) -> std::string::String {
-    //parse shit here
-    let document = Html::parse_document(webpage);
-    let sel = Selector::parse("#download_link").unwrap();
-
-    let res = String::from(document.select(&sel).next().unwrap().value().attr("href").unwrap());
-
-    return res;
-}
 
 fn get_apk(target: &str){
-    let mut resp = reqwest::get(target)
-        .expect("request failed");
-    let resp_text = resp.text().unwrap();
-    let apk_url = process_apk_webpage(resp_text.as_str()); 
-    resp = reqwest::get(apk_url.as_str())
-        .expect("request failed");
-    let mut out = File::create("magiarecord.apk")
-        .expect("failed to create file (apk)");
-    let _fileoutresult = io::copy(&mut resp, &mut out);
-    //release the filehandle
-    drop(out);
+    //https://users.rust-lang.org/t/download-file-from-web/19863 3 lines and it worked lol
+    let mut resp = reqwest::get(target).expect("request failed");
+    let mut out = File::create("magiarecord.apk").expect("failed to create file");
+    io::copy(&mut resp, &mut out).expect("failed to copy content");
 }
 
 fn get_na_apk(){
@@ -168,7 +151,7 @@ fn get_na_apk(){
 }
 
 fn get_jp_apk(){
-    let target = "https://apkpure.com/%E3%83%9E%E3%82%AE%E3%82%A2%E3%83%AC%E3%82%B3%E3%83%BC%E3%83%89-%E9%AD%94%E6%B3%95%E5%B0%91%E5%A5%B3%E3%81%BE%E3%81%A9%E3%81%8B%E3%83%9E%E3%82%AE%E3%82%AB%E5%A4%96%E4%BC%9D/com.aniplex.magireco/download";
+    let target = "https://jp.rika.ren/apk/Origin/com.aniplex.magireco.arm8.apk";
     get_apk(target);
 }
 
