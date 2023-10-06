@@ -1,54 +1,83 @@
 extern crate reqwest;
 extern crate zip;
 
+use std::collections::HashMap;
 use std::io;
 use std::fs;
 use std::fs::File;
 use std::process::Command;
 use std::env;
 use std::path::Path;
-use std::io::Write;
 
 
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let na_flag = args.iter().any(|x| x == "-NA" || x == "-na");
     let force_local_adb_flag = args.iter().any(|x| x == "-forceLocalADB");
     let force_adb_download_flag = args.iter().any(|x| x == "-forceADBDownload");
-    let use_old_apk_flag = args.iter().any(|x| x == "-noAPKDownload");
     let no_install_flag = args.iter().any(|x| x == "-noInstall");
     let do_nothing_flag = args.iter().any(|x| x == "-doNothing");
 
-    if(do_nothing_flag){
+    let emulator_connection = HashMap::from([
+        ("bluestacks", "todo: change this"),
+        ("nox", "todo: change this"),
+        ("wsa", "todo: change this"),
+    ]);
+
+    let mut switch_option = String::new();
+    let mut device_type = String::new();
+    let mut emulator_type = String::new();
+    //let mut apk_type = String::new();
+
+    println!("Select your device\n 1.- Phone\n 2.- Emulator");
+    io::stdin().read_line(&mut switch_option).expect("A problem has occured");
+    let device_type_option : i8 = switch_option.trim().parse().expect("an integer lol");
+    match device_type_option{
+        1 => device_type = String::from("phone"),
+        2 => device_type = String::from("emulator"),
+        _ => main()
+    }
+
+    if device_type == "emulator" {
+        println!("Select your emulator\n 1.- Bluestacks\n 2.- Nox Player\n 3.- Windows Subsystem for Android");
+        io::stdin().read_line(&mut switch_option).expect("A problem has occured");
+        let emulator_type_option : i8 = switch_option.trim().parse().expect("an integer lol");
+        match emulator_type_option{
+            1 => emulator_type = String::from("bluestacks"),
+            2 => emulator_type = String::from("nox"),
+            3 => emulator_type = String::from("wsa"),
+            _ => main()
+        }
+    }
+
+    /* Pending if rayshift starts uploading releases in github, should check how to get last release whenever it's available
+    println!("Device type: {}", device_type);
+    println!("Select desired APK\n 1.- Vanilla APK\n 2.- Rayshift APK")
+    */
+
+    
+    if do_nothing_flag {
         return;
     }
 
-    if(force_adb_download_flag || ((!detect_native_adb() || force_local_adb_flag)  && !detect_prev_downloaded_adb())){
+    if force_adb_download_flag || ((!detect_native_adb() || force_local_adb_flag)  && !detect_prev_downloaded_adb()) {
         //print!("Downloading ADB");
         //todo, request confirmation of acceptance of adb licence
         get_platform_tools();
     }
     
-    if(!use_old_apk_flag){
-        if(na_flag){
-            print!("Using NA APK\n");
-            get_na_apk();
-        } else {
-            print!("Using JP APK\n");
-            get_jp_apk();
-        }
-    }
+    println!("Using JP APK\n");
+    get_jp_apk();
 
     let phonepath = "/data/local/tmp/magiarecord.apk";
 
-    if(!no_install_flag){
-        install_apk((force_local_adb_flag || !detect_native_adb()), phonepath);
+    if !no_install_flag {
+        install_apk(force_local_adb_flag || !detect_native_adb(), phonepath);
     }
     
-    print!("Done! -- Press Enter to continue");
-    io::stdout().flush();//print requires manual flushing of lines...
+    println!("Done! -- Press Enter to continue");
     io::stdin().read_line(&mut String::new()).unwrap();
+     
 } 
 
 
@@ -86,7 +115,7 @@ fn get_platform_tools(){
     //this entire block is hacky i should really use a native adb server emulation instead
     //but that does not exist, so instead this will have to do
     let target = get_url_for_platform_tools();
-    if(target == "unknown"){
+    if target == "unknown" {
         print!("Not a known os, you should manually configure ADB for your platform before running this script");
         std::process::exit(1);
     }
@@ -113,9 +142,9 @@ fn unzip_archive(path: &str){
     
     for i in 0 .. archive.len() {
         let mut file_to_extract = archive.by_index(i).unwrap();
-        let outpath = file_to_extract.sanitized_name();
+        let outpath = file_to_extract.mangled_name();
 
-        if(file_to_extract.name().ends_with('/')){
+        if file_to_extract.name().ends_with('/') {
             fs::create_dir_all(&outpath).unwrap();
         } else {
             if let Some(p) = outpath.parent() {
@@ -145,11 +174,6 @@ fn get_apk(target: &str){
     io::copy(&mut resp, &mut out).expect("failed to copy content");
 }
 
-fn get_na_apk(){
-    let target = "https://apkpure.com/magia-record-english/com.aniplex.magireco.en/download";
-    get_apk(target);
-}
-
 fn get_jp_apk(){
     let target = "https://jp.rika.ren/apk/Origin/com.aniplex.magireco.arm8.apk";
     get_apk(target);
@@ -165,22 +189,21 @@ fn install_apk(local: bool, phonepath: &str){
         "./platform-tools/adb"
     };
 
-    print!("Waiting for Android device on ADB\n");
-    io::stdout().flush();//print requires manual flushing of lines...
+    println!("Waiting for Android device on ADB\n");
     let mut adb_wait_process = Command::new(adbcmd)
         .arg("wait-for-device")
         .spawn()
         .expect("Failed to wait for a device on adb");
+    
     print!("done!\nPushing APK\n");
-    io::stdout().flush();//print requires manual flushing of lines...
     adb_wait_process.wait().expect("Failed while waiting for device");
     let mut adb_push_process = Command::new(adbcmd)
         .args(&["push", "magiarecord.apk", phonepath])
         .spawn()
         .expect("Failed to push apk");
     adb_push_process.wait().expect("Failed while waiting for apk push");
-    print!("done!\nInstalling APK\n");
-    io::stdout().flush();//print requires manual flushing of lines...
+
+    println!("done!\nInstalling APK\n");
     let mut adb_install_process = Command::new(adbcmd)
         .args(&["shell", "pm", "install", "-i", "\"com.android.vending\"", "-r", phonepath])
         .spawn()
