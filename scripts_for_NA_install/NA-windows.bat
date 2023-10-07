@@ -1,1 +1,0 @@
-magiarecord_automatic_updater.exe -NA
