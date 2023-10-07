@@ -17,45 +17,18 @@ fn main() {
     let force_adb_download_flag = args.iter().any(|x| x == "-forceADBDownload");
     let no_install_flag = args.iter().any(|x| x == "-noInstall");
     let do_nothing_flag = args.iter().any(|x| x == "-doNothing");
-
-    let emulator_connection = HashMap::from([
-        ("bluestacks", "todo: change this"),
-        ("nox", "todo: change this"),
-        ("wsa", "todo: change this"),
+    let device_type_option;
+    let emulator_type_option;
+    let emulators_ports = HashMap::from([
+        ("nox", "62001"),
+        ("wsa", "58526"),
     ]);
 
-    let mut switch_option = String::new();
-    let mut device_type = String::new();
-    let mut emulator_type = String::new();
+    let mut switch_option : String = String::new();
+    let mut device_type : String = String::new();
+    let mut emulator_type : String = String::new();
     //let mut apk_type = String::new();
 
-    println!("Select your device\n 1.- Phone\n 2.- Emulator");
-    io::stdin().read_line(&mut switch_option).expect("A problem has occured");
-    let device_type_option : i8 = switch_option.trim().parse().expect("an integer lol");
-    match device_type_option{
-        1 => device_type = String::from("phone"),
-        2 => device_type = String::from("emulator"),
-        _ => main()
-    }
-
-    if device_type == "emulator" {
-        println!("Select your emulator\n 1.- Bluestacks\n 2.- Nox Player\n 3.- Windows Subsystem for Android");
-        io::stdin().read_line(&mut switch_option).expect("A problem has occured");
-        let emulator_type_option : i8 = switch_option.trim().parse().expect("an integer lol");
-        match emulator_type_option{
-            1 => emulator_type = String::from("bluestacks"),
-            2 => emulator_type = String::from("nox"),
-            3 => emulator_type = String::from("wsa"),
-            _ => main()
-        }
-    }
-
-    /* Pending if rayshift starts uploading releases in github, should check how to get last release whenever it's available
-    println!("Device type: {}", device_type);
-    println!("Select desired APK\n 1.- Vanilla APK\n 2.- Rayshift APK")
-    */
-
-    
     if do_nothing_flag {
         return;
     }
@@ -65,6 +38,37 @@ fn main() {
         //todo, request confirmation of acceptance of adb licence
         get_platform_tools();
     }
+
+    clear_console();
+    print!("Friendly reminder to search how to turn on usb debugging in your device");
+    println!("Select your device\n 1.- Phone/Bluestacks\n 2.- Other Emulator"); //Bluestacks doesn't require IP connection via adb to install an apk
+    io::stdin().read_line(&mut switch_option).expect("A problem has occured");
+    device_type_option = switch_option.trim().parse().expect("a number");
+    match device_type_option{
+        1 => device_type = String::from("phone"),
+        2 => device_type = String::from("emulator"),
+        _ => main()
+    }
+
+    clear_console();
+
+    if device_type == "emulator" {
+        switch_option = String::new();
+        println!("Select your emulator\n 1.- Nox Player\n 2.- Windows Subsystem for Android");
+        io::stdin().read_line(&mut switch_option).expect("A problem has occured");
+        emulator_type_option = switch_option.trim().parse().expect("a number");
+        match emulator_type_option{
+            1 => emulator_type = String::from("nox"),
+            2 => emulator_type = String::from("wsa"),
+            _ => main()
+        }
+        connect_to_emu(force_local_adb_flag || !detect_native_adb(), emulators_ports.get(emulator_type.as_str()).unwrap(), emulator_type)
+    }
+    
+    /* Pending if rayshift starts uploading releases in github, should check how to get last release whenever it's available
+    println!("Device type: {}", device_type);
+    println!("Select desired APK\n 1.- Vanilla APK\n 2.- Rayshift APK")
+    */
     
     println!("Using JP APK\n");
     get_jp_apk();
@@ -78,8 +82,50 @@ fn main() {
     println!("Done! -- Press Enter to continue");
     io::stdin().read_line(&mut String::new()).unwrap();
      
-} 
+}
 
+fn pause(){
+    println!("Press enter to continue...");
+    
+    let mut pause = String::new();
+    io::stdin().read_line(&mut pause).expect("Error... somehow");
+}
+
+fn clear_console() -> Result<(), io::Error> {
+    if cfg!(target_os="windows"){
+        Command::new("cmd")
+            .args(&["/C", "cls"])
+            .status()?;
+    }
+    else {
+        Command::new("clear")
+            .status()?;
+    };
+    Ok(())
+}
+
+fn connect_to_emu(local: bool, port: &&str, emulator_type: String){
+    clear_console();
+    let adbcmd = if !local {
+        "adb"
+    } else if cfg!(windows){
+        ".\\platform-tools\\adb.exe"
+    } else {
+        "./platform-tools/adb"
+    };
+
+    if emulator_type == "wsa" {
+        println!("ADB might say 'failed to authenticate', don't worry about and accept the usb debugging prompt that will pop up, if not, skip this message\nAnother note, since WSA doesn't have play services, you won't be able to whale");
+        pause()
+    }
+
+    println!("Waiting for emulator connection in ADB\n");
+    let mut adb_connect_emu = Command::new(adbcmd)
+        .args(&["connect", format!("localhost:{}", port).as_str()])
+        .spawn()
+        .expect("Failed to wait for a device on adb");
+    adb_connect_emu.wait().expect("Failed while connecting to emulator");
+}
 
 fn detect_prev_downloaded_adb() -> bool {
     let path_to_check = if cfg!(windows){
@@ -89,8 +135,6 @@ fn detect_prev_downloaded_adb() -> bool {
     };
     return Path::new(path_to_check).exists();
 }
-
-
 
 fn detect_native_adb() -> bool {
     let res = which::which("adb").is_ok();
@@ -166,7 +210,6 @@ fn unzip_archive(path: &str){
     
 }
 
-
 fn get_apk(target: &str){
     //https://users.rust-lang.org/t/download-file-from-web/19863 3 lines and it worked lol
     let mut resp = reqwest::get(target).expect("request failed");
@@ -195,7 +238,7 @@ fn install_apk(local: bool, phonepath: &str){
         .spawn()
         .expect("Failed to wait for a device on adb");
     
-    print!("done!\nPushing APK\n");
+    print!("done!\nPushing APK... if nothing happens, double check the usb debugging prompt and accept it\n");
     adb_wait_process.wait().expect("Failed while waiting for device");
     let mut adb_push_process = Command::new(adbcmd)
         .args(&["push", "magiarecord.apk", phonepath])
@@ -209,4 +252,11 @@ fn install_apk(local: bool, phonepath: &str){
         .spawn()
         .expect("Failed to install apk");
     adb_install_process.wait().expect("Failed while waiting on install");
+    
+    println!("Killing adb server");
+    let mut adb_kill_server = Command::new(adbcmd)
+    .arg("kill-server")
+    .spawn()
+    .expect("Failed to kill server");
+    adb_kill_server.wait().expect("Failled to kill adb server");
 }
