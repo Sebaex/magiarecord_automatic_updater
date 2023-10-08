@@ -40,7 +40,7 @@ fn main() {
     }
 
     clear_console();
-    print!("Friendly reminder to search how to turn on usb debugging in your device");
+    println!("Friendly reminder to search how to turn on usb debugging in your device");
     println!("Select your device\n 1.- Phone/Bluestacks\n 2.- Other Emulator"); //Bluestacks doesn't require IP connection via adb to install an apk
     io::stdin().read_line(&mut switch_option).expect("A problem has occured");
     device_type_option = switch_option.trim().parse().expect("a number");
